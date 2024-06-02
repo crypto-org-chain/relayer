@@ -191,7 +191,19 @@ type jsonrpcMessage struct {
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Error   *jsonError      `json:"error,omitempty"`
-	Result  hexutil.Uint    `json:"result,omitempty"`
+	Result  json.RawMessage `json:"result,omitempty"`
+}
+
+type rpcMessageResultTx struct {
+	Hash bytes.HexBytes `json:"hash,omitempty"`
+}
+
+type rpcMessageResult struct {
+	Txs []rpcMessageResultTx `json:"txs,omitempty"`
+}
+
+type rpcMessage struct {
+	Result rpcMessageResult `json:"result,omitempty"`
 }
 
 // SendMessagesToMempool simulates and broadcasts a transaction with the given msgs and memo.
@@ -226,31 +238,59 @@ func (cc *CosmosProvider) SendMessagesToMempool(
 	var txBytes []byte
 	var sequence uint64
 	var fees sdk.Coins
+	var ethTx *evmtypes.MsgEthereumTx
 	if len(cc.PCfg.PrecompiledContractAddress) > 0 {
-		txBytes, sequence, fees, err = cc.buildEvmMessages(ctx, txf, txb)
+		ethTx, txBytes, sequence, fees, err = cc.buildEvmMessages(ctx, txf, txb)
+		done()
+		bin, err := ethTx.AsTransaction().MarshalBinary()
+		if err != nil {
+			return err
+		}
+		raw, err := hexutil.Decode(hexutil.Encode(bin))
+		if err != nil {
+			return err
+		}
+		res, err := cc.call(ctx, []hexutil.Bytes{raw}, "eth_sendRawTransaction")
+		if err != nil {
+			return err
+		}
+		address, err := cc.Address()
+		if err != nil {
+			return fmt.Errorf("failed to get relayer bech32 wallet address: %w", err)
+		}
+		cc.UpdateFeesSpent(cc.ChainId(), cc.Key(), address, fees, dynamicFee)
+		var ethHash string
+		if err = json.Unmarshal(res, &ethHash); err != nil {
+			return err
+		}
+		txHash, err := cc.getTxByEthHash(ctx, ethHash)
+		if err != nil {
+			return err
+		}
+		go cc.waitForTx(asyncCtx, txHash, msgs, defaultBroadcastWaitTimeout, asyncCallbacks)
 	} else {
 		txBytes, sequence, fees, err = cc.buildMessages(ctx, txf, txb, txSignerKey)
-	}
-	done()
-	if err != nil {
-		// Account sequence mismatch errors can happen on the simulated transaction also.
-		if strings.Contains(err.Error(), legacyerrors.ErrWrongSequence.Error()) {
-			cc.handleAccountSequenceMismatchError(sequenceGuard, err)
+		done()
+		if err != nil {
+			// Account sequence mismatch errors can happen on the simulated transaction also.
+			if strings.Contains(err.Error(), legacyerrors.ErrWrongSequence.Error()) {
+				cc.handleAccountSequenceMismatchError(sequenceGuard, err)
+			}
+
+			return err
 		}
 
-		return err
+		err = cc.broadcastTx(
+			ctx,
+			txBytes,
+			msgs,
+			fees,
+			asyncCtx,
+			defaultBroadcastWaitTimeout,
+			asyncCallbacks,
+			dynamicFee,
+		)
 	}
-
-	err = cc.broadcastTx(
-		ctx,
-		txBytes,
-		msgs,
-		fees,
-		asyncCtx,
-		defaultBroadcastWaitTimeout,
-		asyncCallbacks,
-		dynamicFee,
-	)
 
 	if err != nil {
 		if strings.Contains(err.Error(), legacyerrors.ErrWrongSequence.Error()) {
@@ -869,15 +909,15 @@ func (cc *CosmosProvider) buildEvmMessages(
 	ctx context.Context,
 	txf *tx.Factory,
 	txb client.TxBuilder,
-) ([]byte, uint64, sdk.Coins, error) {
+) (*evmtypes.MsgEthereumTx, []byte, uint64, sdk.Coins, error) {
 	chainID, err := ethermintcodecs.ParseChainID(cc.PCfg.ChainID)
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	gasLimit := txf.Gas()
 	gasPrices, err := convertCoins(cc.PCfg.GasPrices)
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	gasPriceCoin := gasPrices[0]
 	gasPrice := gasPriceCoin.Amount.BigInt()
@@ -887,7 +927,7 @@ func (cc *CosmosProvider) buildEvmMessages(
 		var ok bool
 		gasTipCap, ok = new(big.Int).SetString(cc.PCfg.ExtensionOptions[0].Value, 10)
 		if !ok {
-			return nil, 0, sdk.Coins{}, errors.New("unsupported extOption")
+			return nil, nil, 0, sdk.Coins{}, errors.New("unsupported extOption")
 		}
 	}
 	fees := make(sdk.Coins, 0)
@@ -898,15 +938,15 @@ func (cc *CosmosProvider) buildEvmMessages(
 	msgs := txb.GetTx().GetMsgs()
 	signers := extractSigners(msgs[0])
 	if len(signers) != 1 {
-		return nil, 0, sdk.Coins{}, sdkerrors.Wrapf(legacyerrors.ErrUnknownRequest, "invalid signers length %d", len(signers))
+		return nil, nil, 0, sdk.Coins{}, sdkerrors.Wrapf(legacyerrors.ErrUnknownRequest, "invalid signers length %d", len(signers))
 	}
 	from, err := convertAddress(signers[0].String())
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	data, err := cc.getPayloads(contractAddress, msgs)
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	nonce := txf.Sequence()
 	amount := big.NewInt(0)
@@ -917,7 +957,7 @@ func (cc *CosmosProvider) buildEvmMessages(
 	tx.From = from.Bytes()
 	if err := tx.ValidateBasic(); err != nil {
 		cc.log.Info("tx failed basic validation", zap.Error(err))
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	if err := retry.Do(func() error {
 		signer := ethtypes.MakeSigner(getChainConfig(chainID), blockNumber)
@@ -926,7 +966,7 @@ func (cc *CosmosProvider) buildEvmMessages(
 		}
 		return nil
 	}, retry.Context(ctx), rtyAtt, rtyDel, rtyErr); err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	if feeAmt := sdkmath.NewIntFromBigInt(tx.GetFee()); feeAmt.Sign() > 0 {
 		fees = fees.Add(sdk.NewCoin(gasPriceCoin.Denom, feeAmt))
@@ -936,12 +976,12 @@ func (cc *CosmosProvider) buildEvmMessages(
 
 	builder, ok := txb.(authtx.ExtensionOptionsTxBuilder)
 	if !ok {
-		return nil, 0, sdk.Coins{}, errors.New("unsupported builder")
+		return nil, nil, 0, sdk.Coins{}, errors.New("unsupported builder")
 	}
 
 	option, err := types.NewAnyWithValue(new(evmtypes.ExtensionOptionsEthereumTx))
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
 	builder.SetExtensionOptions(option)
 	builder.SetMsgs(tx)
@@ -949,9 +989,9 @@ func (cc *CosmosProvider) buildEvmMessages(
 	builder.SetGasLimit(txGasLimit)
 	txBytes, err := cc.Cdc.TxConfig.TxEncoder()(builder.GetTx())
 	if err != nil {
-		return nil, 0, sdk.Coins{}, err
+		return nil, nil, 0, sdk.Coins{}, err
 	}
-	return txBytes, txf.Sequence(), fees, nil
+	return tx, txBytes, txf.Sequence(), fees, nil
 }
 
 // MsgCreateClient creates an sdk.Msg to update the client on src with consensus state from dst
@@ -1998,19 +2038,19 @@ func (cc *CosmosProvider) SetWithExtensionOptions(txf tx.Factory) (tx.Factory, e
 	return txf.WithExtensionOptions(extOpts...), nil
 }
 
-func (cc *CosmosProvider) calculateEvmGas(ctx context.Context, arg *evmtypes.TransactionArgs) (uint64, error) {
-	params, err := json.Marshal([]*evmtypes.TransactionArgs{arg})
+func (cc *CosmosProvider) call(ctx context.Context, arg interface{}, method string) (json.RawMessage, error) {
+	params, err := json.Marshal(arg)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	req := jsonrpcMessage{
 		Version: "2.0",
-		Method:  "eth_estimateGas",
+		Method:  method,
 		Params:  params,
 		ID:      []byte("1"),
 	}
 
-	var gas uint64
+	var result json.RawMessage
 	if err = retry.Do(func() error {
 		var buf sysbytes.Buffer
 		err = json.NewEncoder(&buf).Encode(req)
@@ -2037,11 +2077,54 @@ func (cc *CosmosProvider) calculateEvmGas(ctx context.Context, arg *evmtypes.Tra
 		if res.Error != nil {
 			return fmt.Errorf("res err %s", res.Error.Message)
 		}
-		gas = uint64(res.Result)
+		result = res.Result
 		return nil
 	}, retry.Context(ctx), rtyAtt, rtyDel, rtyErr); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (cc *CosmosProvider) getTxByEthHash(ctx context.Context, ethHash string) (txHash []byte, err error) {
+	url := fmt.Sprintf("%s/tx_search?query=\"ethereum_tx.ethereumTxHash='%s'\"&order_by=\"desc\"&limit=\"1\"", cc.PCfg.RPCAddr, ethHash)
+	if err = retry.Do(func() error {
+		resp, err := http.Get(url)
+		if err != nil {
+			return err
+		}
+
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("fail status %d", resp.StatusCode)
+		}
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		var rsp rpcMessage
+		err = json.Unmarshal(data, &rsp)
+		if err != nil {
+			return err
+		}
+		total := len(rsp.Result.Txs)
+		if total != 1 {
+			return fmt.Errorf("invalid ethereum txs found: %d", total)
+		}
+		txHash = rsp.Result.Txs[0].Hash
+		return nil
+	}, retry.Context(ctx), rtyAtt, rtyDel, rtyErr); err != nil {
+		return nil, err
+	}
+	return txHash, nil
+}
+
+func (cc *CosmosProvider) calculateEvmGas(ctx context.Context, arg *evmtypes.TransactionArgs) (uint64, error) {
+	res, err := cc.call(ctx, []*evmtypes.TransactionArgs{arg}, "eth_estimateGas")
+	var result hexutil.Uint
+	if err = json.Unmarshal(res, &result); err != nil {
 		return 0, err
 	}
+	gas := uint64(result)
 	return gas, nil
 }
 
