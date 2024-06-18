@@ -2046,32 +2046,53 @@ func (cc *CosmosProvider) calculateEvmGas(ctx context.Context, arg *evmtypes.Tra
 }
 
 func (cc *CosmosProvider) getPayloads(to common.Address, msgs []sdk.Msg) ([]byte, error) {
-	caller := sdk.AccAddress(to.Bytes()).String()
-	payloads := make([][]byte, 0, len(msgs))
+	maxMsgNum := cc.ProviderConfig().BroadcastMaxMsgNum()
+	broadcastBatch := cc.ProviderConfig().BroadcastMode() == provider.BroadcastModeBatch
+	if broadcastBatch && maxMsgNum < 2 && maxMsgNum != 0 {
+		maxMsgNum = 2
+	}
+	batches := make([][]sdk.Msg, 0)
+	currentBatch := make([]sdk.Msg, 0, maxMsgNum)
 	for _, m := range msgs {
-		t := reflect.TypeOf(m)
-		method, ok := messageMap[t]
-		if !ok {
-			return nil, fmt.Errorf("invalid type %T", m)
+		currentBatch = append(currentBatch, m)
+		if len(currentBatch) >= int(maxMsgNum) {
+			batches = append(batches, currentBatch)
+			currentBatch = make([]sdk.Msg, 0, maxMsgNum)
 		}
-		elem := reflect.ValueOf(m).Elem()
-		if elem.Kind() == reflect.Struct {
-			f := elem.FieldByName("Signer")
-			if f.IsValid() && f.CanSet() && f.Kind() == reflect.String {
-				original := f.String()
-				defer f.SetString(original)
-				f.SetString(caller)
+	}
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+	payloads := make([][][]byte, 0, len(batches))
+	caller := sdk.AccAddress(to.Bytes()).String()
+	for _, msgs := range batches {
+		batchPayloads := make([][]byte, 0)
+		for _, m := range msgs {
+			t := reflect.TypeOf(m)
+			method, ok := messageMap[t]
+			if !ok {
+				return nil, fmt.Errorf("invalid type %T", m)
 			}
+			elem := reflect.ValueOf(m).Elem()
+			if elem.Kind() == reflect.Struct {
+				f := elem.FieldByName("Signer")
+				if f.IsValid() && f.CanSet() && f.Kind() == reflect.String {
+					original := f.String()
+					defer f.SetString(original)
+					f.SetString(caller)
+				}
+			}
+			input, err := proto.Marshal(m)
+			if err != nil {
+				return nil, err
+			}
+			payload, err := relayerABI.Pack(method, input)
+			if err != nil {
+				return nil, err
+			}
+			batchPayloads = append(batchPayloads, payload)
 		}
-		input, err := proto.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		payload, err := relayerABI.Pack(method, input)
-		if err != nil {
-			return nil, err
-		}
-		payloads = append(payloads, payload)
+		payloads = append(payloads, batchPayloads)
 	}
 	return relayerCallerABI.Pack("batchCall", payloads)
 }

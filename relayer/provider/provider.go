@@ -31,6 +31,8 @@ type ProviderConfig interface {
 	NewProvider(log *zap.Logger, homepath string, debug bool, chainName string) (ChainProvider, error)
 	Validate() error
 	BroadcastMode() BroadcastMode
+	BroadcastMaxMsgNum() uint64
+	HasPrecompiledContractAddress() bool
 }
 
 type RelayerMessage interface {

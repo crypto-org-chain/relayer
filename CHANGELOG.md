@@ -34,6 +34,7 @@
 * [\#11](https://github.com/crypto-org-chain/relayer/pull/11) Fix gasFeeCap and gasPrice when new evm tx.
 * [\#1455](https://github.com/cosmos/relayer/pull/1455) Allow retry for pathEnd to avoid packet message get removed before open channel.
 * [\#14](https://github.com/crypto-org-chain/relayer/pull/14) Support batch EVM transactions.
+* [\#1470](https://github.com/cosmos/relayer/pull/1470) Add max-msg-num parameter for batch broadcast in chain configs.
 
 ## v0.9.3
 

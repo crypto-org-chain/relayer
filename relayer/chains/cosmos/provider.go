@@ -56,6 +56,7 @@ type CosmosProviderConfig struct {
 	Slip44           *int                       `json:"coin-type" yaml:"coin-type"`
 	SigningAlgorithm string                     `json:"signing-algorithm" yaml:"signing-algorithm"`
 	Broadcast        provider.BroadcastMode     `json:"broadcast-mode" yaml:"broadcast-mode"`
+	MaxMsgNum        uint64                     `json:"max-msg-num" yaml:"max-msg-num"`
 	MinLoopDuration  time.Duration              `json:"min-loop-duration" yaml:"min-loop-duration"`
 	ExtensionOptions []provider.ExtensionOption `json:"extension-options" yaml:"extension-options"`
 
@@ -90,6 +91,14 @@ func (pc CosmosProviderConfig) Validate() error {
 
 func (pc CosmosProviderConfig) BroadcastMode() provider.BroadcastMode {
 	return pc.Broadcast
+}
+
+func (pc CosmosProviderConfig) BroadcastMaxMsgNum() uint64 {
+	return pc.MaxMsgNum
+}
+
+func (pc CosmosProviderConfig) HasPrecompiledContractAddress() bool {
+	return pc.PrecompiledContractAddress != ""
 }
 
 // NewProvider validates the CosmosProviderConfig, instantiates a ChainClient and then instantiates a CosmosProvider
