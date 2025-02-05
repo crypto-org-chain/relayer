@@ -193,11 +193,15 @@ Additional information on how IBC works can be found [here](https://ibc.cosmos.n
      $ rly start
      ```
 
-    >When running multiple instances of `rly start`, you will need to use the `--debug-addr` flag and provide an address:port. You can also pass an empty string `''`  to turn off this feature or pass `localhost:0` to randomly select a port.
+    >When running multiple instances of `rly start`, you will need to use the `--enable-debug-server` and `--debug-listen-addr` flag and provide an address:port. You can also pass an empty string `''`  to turn off this feature or pass `localhost:0` to randomly select a port.
 
     ---
     [[TROUBLESHOOTING](docs/troubleshooting.md)]
 ---
+
+## Production deployment recomendations
+
+- Make sure the debug server is disabled in production.
 
 ## Security Notice
 

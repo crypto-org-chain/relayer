@@ -39,6 +39,10 @@ const (
 	flagOrder                          = "order"
 	flagVersion                        = "version"
 	flagDebugAddr                      = "debug-addr"
+	flagEnableDebugServer              = "enable-debug-server"
+	flagDebugListenAddr                = "debug-listen-addr"
+	flagEnableMetricsServer            = "enable-metrics-server"
+	flagMetricsListenAddr              = "metrics-listen-addr"
 	flagOverwriteConfig                = "overwrite"
 	flagLimit                          = "limit"
 	flagHeight                         = "height"
@@ -50,6 +54,7 @@ const (
 	flagInitialBlockHistory            = "block-history"
 	flagFlushInterval                  = "flush-interval"
 	flagMemo                           = "memo"
+	flagKeyName                        = "key-name"
 	flagFilterRule                     = "filter-rule"
 	flagFilterChannels                 = "filter-channels"
 	flagSrcChainID                     = "src-chain-id"
@@ -420,11 +425,60 @@ func debugServerFlags(v *viper.Viper, cmd *cobra.Command) *cobra.Command {
 	cmd.Flags().String(
 		flagDebugAddr,
 		"",
-		"address to use for debug and metrics server. By default, "+
-			"will be the api-listen-addr parameter in the global config.",
+		"address to use for debug server. By default, "+
+			"will be the debug-listen-addr parameter in the global config. "+
+			"DEPRECATED: Use --debug-listen-addr flag.",
 	)
 
 	if err := v.BindPFlag(flagDebugAddr, cmd.Flags().Lookup(flagDebugAddr)); err != nil {
+		panic(err)
+	}
+
+	cmd.Flags().String(
+		flagDebugListenAddr,
+		"",
+		"address to use for debug server. By default, "+
+			"will be the debug-listen-addr parameter in the global config. "+
+			"Make sure to enable debug server using --enable-debug-server flag.",
+	)
+
+	if err := v.BindPFlag(flagDebugListenAddr, cmd.Flags().Lookup(flagDebugListenAddr)); err != nil {
+		panic(err)
+	}
+
+	cmd.Flags().Bool(
+		flagEnableDebugServer,
+		false,
+		"enables debug server. By default, the debug server is disabled due to security concerns.",
+	)
+
+	if err := v.BindPFlag(flagEnableDebugServer, cmd.Flags().Lookup(flagEnableDebugServer)); err != nil {
+		panic(err)
+	}
+
+	return cmd
+}
+
+func metricsServerFlags(v *viper.Viper, cmd *cobra.Command) *cobra.Command {
+	cmd.Flags().String(
+		flagMetricsListenAddr,
+		"",
+		"address to use for metrics server. By default, "+
+			"will be the metrics-listen-addr parameter in the global config. "+
+			"Make sure to enable metrics server using --enable-metrics-server flag.",
+	)
+
+	if err := v.BindPFlag(flagMetricsListenAddr, cmd.Flags().Lookup(flagMetricsListenAddr)); err != nil {
+		panic(err)
+	}
+
+	cmd.Flags().Bool(
+		flagEnableMetricsServer,
+		false,
+		"enables metrics server. By default, the metrics server is disabled due to security concerns.",
+	)
+
+	if err := v.BindPFlag(flagEnableMetricsServer, cmd.Flags().Lookup(flagEnableMetricsServer)); err != nil {
 		panic(err)
 	}
 
@@ -472,6 +526,14 @@ func flushIntervalFlag(v *viper.Viper, cmd *cobra.Command) *cobra.Command {
 func memoFlag(v *viper.Viper, cmd *cobra.Command) *cobra.Command {
 	cmd.Flags().String(flagMemo, "", "a memo to include in relayed packets")
 	if err := v.BindPFlag(flagMemo, cmd.Flags().Lookup(flagMemo)); err != nil {
+		panic(err)
+	}
+	return cmd
+}
+
+func keyNameFlag(v *viper.Viper, cmd *cobra.Command) *cobra.Command {
+	cmd.Flags().String(flagKeyName, "", "a key from the keychain associated with a particular chain")
+	if err := v.BindPFlag(flagKeyName, cmd.Flags().Lookup(flagKeyName)); err != nil {
 		panic(err)
 	}
 	return cmd

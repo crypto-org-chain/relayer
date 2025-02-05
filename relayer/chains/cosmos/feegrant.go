@@ -182,7 +182,7 @@ func (cc *CosmosProvider) ConfigureWithExternalGranter(grantees []string, grante
 	for _, grantee := range grantees {
 		k, err := cc.KeyFromKeyOrAddress(grantee)
 		if k == "" {
-			return fmt.Errorf("invalid empty grantee name")
+			return errors.New("invalid empty grantee name")
 		} else if err != nil {
 			return err
 		}
@@ -332,7 +332,7 @@ func (cc *CosmosProvider) EnsureBasicGrants(ctx context.Context, memo string, ga
 	}
 
 	if len(msgs) > 0 {
-		cliCtx := client.Context{}.WithClient(cc.RPCClient).
+		cliCtx := client.Context{}.
 			WithInterfaceRegistry(cc.Cdc.InterfaceRegistry).
 			WithChainID(cc.PCfg.ChainID).
 			WithCodec(cc.Cdc.Marshaler).

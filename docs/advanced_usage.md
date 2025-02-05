@@ -4,8 +4,10 @@
 
 **Prometheus exporter**
 
-If you started `rly` with the default `--debug-addr` argument,
-you can use `http://$IP:5183/relayer/metrics` as a target for your prometheus scraper.
+If you started `rly` with `--enable-metrics-server` argument,
+you can use `http://127.0.0.1:5184/relayer/metrics` as a target for your prometheus scraper.
+
+You can use `--metrics-listen-addr $IP:7777` to customize the address and port where the metrics server. 
 
 
 Exported metrics:
@@ -17,7 +19,7 @@ Exported metrics:
 | cosmos_relayer_chain_latest_height            	| The current height of the chain                                                                                                                                                                                              	|   Gauge  	|
 | cosmos_relayer_wallet_balance                 	| The current balance for the relayer's wallet                                                                                                                                                                                 	|   Gauge  	|
 | cosmos_relayer_fees_spent                     	| The amount of fees spent from the relayer's wallet                                                                                                                                                                           	|   Gauge  	|
-| cosmos_relayer_tx_failure                     	| <br>The total number of tx failures broken up into categories:<br> - "packet messages are redundant"<br> - "insufficient funds"<br> - "invalid coins"<br> - "out of gas"<br><br><br>"Tx Failure" is the the catch all bucket 	|   Counter |
+| cosmos_relayer_tx_failure                     	| <br>The total number of tx failures broken up into categories:<br> - "packet messages are redundant"<br> - "insufficient funds"<br> - "invalid coins"<br> - "out of gas"<br><br><br>"Tx Failure" is the catch all bucket 	|   Counter |
 | cosmos_relayer_block_query_errors_total       	| The total number of block query failures. The failures are separated into two categories:<br> - "RPC Client"<br> - "IBC Header"                                                                                              	|   Counter |
 | cosmos_relayer_client_expiration_seconds      	| Seconds until the client expires                                                                                                                                                                                             	|   Gauge 	|
 | cosmos_relayer_client_trusting_period_seconds 	| The trusting period (in seconds) of the client                                                                                                                                                                               	|   Gauge   |

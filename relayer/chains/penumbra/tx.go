@@ -23,14 +23,14 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	legacyerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	cosmosproto "github.com/cosmos/gogoproto/proto"
-	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
-	conntypes "github.com/cosmos/ibc-go/v8/modules/core/03-connection/types"
-	chantypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
-	commitmenttypes "github.com/cosmos/ibc-go/v8/modules/core/23-commitment/types"
-	host "github.com/cosmos/ibc-go/v8/modules/core/24-host"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	tmclient "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
+	transfertypes "github.com/cosmos/ibc-go/v9/modules/apps/transfer/types"
+	clienttypes "github.com/cosmos/ibc-go/v9/modules/core/02-client/types"
+	conntypes "github.com/cosmos/ibc-go/v9/modules/core/03-connection/types"
+	chantypes "github.com/cosmos/ibc-go/v9/modules/core/04-channel/types"
+	commitmenttypes "github.com/cosmos/ibc-go/v9/modules/core/23-commitment/types"
+	host "github.com/cosmos/ibc-go/v9/modules/core/24-host"
+	ibcexported "github.com/cosmos/ibc-go/v9/modules/core/exported"
+	tmclient "github.com/cosmos/ibc-go/v9/modules/light-clients/07-tendermint"
 	ics23 "github.com/cosmos/ics23/go"
 	"github.com/cosmos/relayer/v2/relayer/chains/cosmos"
 	penumbrafee "github.com/cosmos/relayer/v2/relayer/chains/penumbra/core/component/fee/v1"
@@ -248,7 +248,7 @@ type ValidatorUpdate struct {
 }
 
 func (cc *PenumbraProvider) getAnchor(ctx context.Context) (*penumbracrypto.MerkleRoot, error) {
-	status, err := cc.RPCClient.Status(ctx)
+	status, err := cc.ConsensusClient.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -311,6 +311,7 @@ func (cc *PenumbraProvider) sendMessagesInner(ctx context.Context, msgs []provid
 	txBody := penumbratypes.TransactionBody{
 		Actions: make([]*penumbratypes.Action, 0),
 		TransactionParameters: &penumbratypes.TransactionParameters{
+			ChainId: cc.ChainId(),
 			Fee: &penumbrafee.Fee{
 				Amount: &penumbraasset.Amount{Lo: 0, Hi: 0},
 			},
@@ -344,7 +345,7 @@ func (cc *PenumbraProvider) sendMessagesInner(ctx context.Context, msgs []provid
 		return nil, err
 	}
 
-	return cc.RPCClient.BroadcastTxSync(ctx, txBytes)
+	return cc.ConsensusClient.BroadcastTxSync(ctx, txBytes)
 }
 
 // SendMessages attempts to sign, encode, & send a slice of RelayerMessages
@@ -371,7 +372,7 @@ func (cc *PenumbraProvider) SendMessages(ctx context.Context, msgs []provider.Re
 		ctx, cancel := context.WithTimeout(ctx, 40*time.Second)
 		defer cancel()
 
-		res, err := cc.RPCClient.Tx(ctx, syncRes.Hash, false)
+		res, err := cc.ConsensusClient.Tx(ctx, syncRes.Hash, false)
 		if err != nil {
 			return err
 		}
@@ -436,7 +437,7 @@ func parseEventsFromTxResponse(resp *sdk.TxResponse) []provider.RelayerEvent {
 	return events
 }
 
-// CreateClient creates an sdk.Msg to update the client on src with consensus state from dst
+// MsgCreateClient creates an sdk.Msg to update the client on src with consensus state from dst
 func (cc *PenumbraProvider) MsgCreateClient(clientState ibcexported.ClientState, consensusState ibcexported.ConsensusState) (provider.RelayerMessage, error) {
 	signer, err := cc.Address()
 	if err != nil {
@@ -564,7 +565,7 @@ func (cc *PenumbraProvider) ConnectionOpenTry(ctx context.Context, dstQueryProvi
 		// If the connection state proof is empty, there is no point in returning the MsgConnectionOpenTry.
 		// We are not using (*conntypes.MsgConnectionOpenTry).ValidateBasic here because
 		// that chokes on cross-chain bech32 details in ibc-go.
-		return nil, fmt.Errorf("received invalid zero-length connection state proof")
+		return nil, errors.New("received invalid zero-length connection state proof")
 	}
 
 	if acc, err = cc.Address(); err != nil {
@@ -581,7 +582,10 @@ func (cc *PenumbraProvider) ConnectionOpenTry(ctx context.Context, dstQueryProvi
 		ConnectionId: dstConnId,
 		Prefix:       dstPrefix,
 	}
-
+	cs, ok := clientState.(*tmclient.ClientState)
+	if !ok {
+		return nil, sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "expected: %T, got: %T", &tmclient.ClientState{}, clientState)
+	}
 	// TODO: Get DelayPeriod from counterparty connection rather than using default value
 	msg := &conntypes.MsgConnectionOpenTry{
 		ClientId:             srcClientId,
@@ -597,7 +601,7 @@ func (cc *PenumbraProvider) ConnectionOpenTry(ctx context.Context, dstQueryProvi
 		ProofInit:       connStateProof,
 		ProofClient:     clientStateProof,
 		ProofConsensus:  consensusStateProof,
-		ConsensusHeight: clientState.GetLatestHeight().(clienttypes.Height),
+		ConsensusHeight: cs.LatestHeight,
 		Signer:          acc,
 	}
 
@@ -636,7 +640,10 @@ func (cc *PenumbraProvider) ConnectionOpenAck(ctx context.Context, dstQueryProvi
 	if err != nil {
 		return nil, err
 	}
-
+	cs, ok := clientState.(*tmclient.ClientState)
+	if !ok {
+		return nil, sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "expected: %T, got: %T", &tmclient.ClientState{}, clientState)
+	}
 	msg := &conntypes.MsgConnectionOpenAck{
 		ConnectionId:             srcConnId,
 		CounterpartyConnectionId: dstConnId,
@@ -649,7 +656,7 @@ func (cc *PenumbraProvider) ConnectionOpenAck(ctx context.Context, dstQueryProvi
 		ProofTry:        connStateProof,
 		ProofClient:     clientStateProof,
 		ProofConsensus:  consensusStateProof,
-		ConsensusHeight: clientState.GetLatestHeight().(clienttypes.Height),
+		ConsensusHeight: cs.LatestHeight,
 		Signer:          acc,
 	}
 
@@ -751,7 +758,7 @@ func (cc *PenumbraProvider) ChannelOpenTry(ctx context.Context, dstQueryProvider
 		// If the connection state proof is empty, there is no point in returning the MsgChannelOpenTry.
 		// We are not using (*conntypes.MsgChannelOpenTry).ValidateBasic here because
 		// that chokes on cross-chain bech32 details in ibc-go.
-		return nil, fmt.Errorf("received invalid zero-length channel state proof")
+		return nil, errors.New("received invalid zero-length channel state proof")
 	}
 
 	if acc, err = cc.Address(); err != nil {
@@ -1354,7 +1361,7 @@ func (cc *PenumbraProvider) ConnectionHandshakeProof(ctx context.Context, msgOpe
 		// If the connection state proof is empty, there is no point in returning the next message.
 		// We are not using (*conntypes.MsgConnectionOpenTry).ValidateBasic here because
 		// that chokes on cross-chain bech32 details in ibc-go.
-		return provider.ConnectionProof{}, fmt.Errorf("received invalid zero-length connection state proof")
+		return provider.ConnectionProof{}, errors.New("received invalid zero-length connection state proof")
 	}
 
 	return provider.ConnectionProof{
@@ -1382,7 +1389,10 @@ func (cc *PenumbraProvider) MsgConnectionOpenTry(msgOpenInit provider.Connection
 		ConnectionId: msgOpenInit.ConnID,
 		Prefix:       msgOpenInit.CounterpartyCommitmentPrefix,
 	}
-
+	cs, ok := proof.ClientState.(*tmclient.ClientState)
+	if !ok {
+		return nil, sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "expected: %T, got: %T", &tmclient.ClientState{}, proof.ClientState)
+	}
 	msg := &conntypes.MsgConnectionOpenTry{
 		ClientId:             msgOpenInit.CounterpartyClientID,
 		PreviousConnectionId: msgOpenInit.CounterpartyConnID,
@@ -1394,7 +1404,7 @@ func (cc *PenumbraProvider) MsgConnectionOpenTry(msgOpenInit provider.Connection
 		ProofInit:            proof.ConnectionStateProof,
 		ProofClient:          proof.ClientStateProof,
 		ProofConsensus:       proof.ConsensusStateProof,
-		ConsensusHeight:      proof.ClientState.GetLatestHeight().(clienttypes.Height),
+		ConsensusHeight:      cs.LatestHeight,
 		Signer:               signer,
 	}
 
@@ -1413,7 +1423,10 @@ func (cc *PenumbraProvider) MsgConnectionOpenAck(msgOpenTry provider.ConnectionI
 	if err != nil {
 		return nil, err
 	}
-
+	cs, ok := proof.ClientState.(*tmclient.ClientState)
+	if !ok {
+		return nil, sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "expected: %T, got: %T", &tmclient.ClientState{}, proof.ClientState)
+	}
 	msg := &conntypes.MsgConnectionOpenAck{
 		ConnectionId:             msgOpenTry.CounterpartyConnID,
 		CounterpartyConnectionId: msgOpenTry.ConnID,
@@ -1426,7 +1439,7 @@ func (cc *PenumbraProvider) MsgConnectionOpenAck(msgOpenTry provider.ConnectionI
 		ProofTry:        proof.ConnectionStateProof,
 		ProofClient:     proof.ClientStateProof,
 		ProofConsensus:  proof.ConsensusStateProof,
-		ConsensusHeight: proof.ClientState.GetLatestHeight().(clienttypes.Height),
+		ConsensusHeight: cs.LatestHeight,
 		Signer:          signer,
 	}
 
@@ -1736,9 +1749,9 @@ func (cc *PenumbraProvider) AcknowledgementFromSequence(ctx context.Context, dst
 	case err != nil:
 		return nil, err
 	case len(txs) == 0:
-		return nil, fmt.Errorf("no transactions returned with query")
+		return nil, errors.New("no transactions returned with query")
 	case len(txs) > 1:
-		return nil, fmt.Errorf("more than one transaction returned with query")
+		return nil, errors.New("more than one transaction returned with query")
 	}
 
 	acks, err := cc.acknowledgementsFromResultTx(dstChanId, dstPortId, srcChanId, srcPortId, txs[0])
@@ -1746,7 +1759,7 @@ func (cc *PenumbraProvider) AcknowledgementFromSequence(ctx context.Context, dst
 	case err != nil:
 		return nil, err
 	case len(acks) == 0:
-		return nil, fmt.Errorf("no ack msgs created from query response")
+		return nil, errors.New("no ack msgs created from query response")
 	}
 
 	var out provider.RelayerMessage
@@ -1859,7 +1872,7 @@ EventLoop:
 		return ackPackets, nil
 	}
 
-	return nil, fmt.Errorf("no packet data found")
+	return nil, errors.New("no packet data found")
 }
 
 // GetIBCUpdateHeader updates the off chain tendermint light client and
@@ -1879,7 +1892,7 @@ func (cc *PenumbraProvider) GetIBCUpdateHeader(ctx context.Context, srch int64, 
 
 func (cc *PenumbraProvider) IBCHeaderAtHeight(ctx context.Context, h int64) (provider.IBCHeader, error) {
 	if h == 0 {
-		return nil, fmt.Errorf("height cannot be 0")
+		return nil, errors.New("height cannot be 0")
 	}
 
 	lightBlock, err := cc.LightProvider.LightBlock(ctx, h)
@@ -1895,7 +1908,7 @@ func (cc *PenumbraProvider) IBCHeaderAtHeight(ctx context.Context, h int64) (pro
 
 func (cc *PenumbraProvider) GetLightSignedHeaderAtHeight(ctx context.Context, h int64) (ibcexported.ClientMessage, error) {
 	if h == 0 {
-		return nil, fmt.Errorf("height cannot be 0")
+		return nil, errors.New("height cannot be 0")
 	}
 
 	lightBlock, err := cc.LightProvider.LightBlock(ctx, h)
@@ -1924,7 +1937,7 @@ func (cc *PenumbraProvider) InjectTrustedFields(ctx context.Context, header ibce
 	// make copy of header stored in mop
 	h, ok := header.(*tmclient.Header)
 	if !ok {
-		return nil, fmt.Errorf("trying to inject fields into non-tendermint headers")
+		return nil, errors.New("trying to inject fields into non-tendermint headers")
 	}
 
 	// retrieve dst client from src chain
@@ -1934,8 +1947,12 @@ func (cc *PenumbraProvider) InjectTrustedFields(ctx context.Context, header ibce
 		return nil, err
 	}
 
+	tmCs, ok := cs.(*tmclient.ClientState)
+	if !ok {
+		return nil, sdkerrors.Wrapf(clienttypes.ErrInvalidClientType, "expected: %T, got: %T", &tmclient.ClientState{}, cs)
+	}
 	// inject TrustedHeight as latest height stored on dst client
-	h.TrustedHeight = cs.GetLatestHeight().(clienttypes.Height)
+	h.TrustedHeight = tmCs.LatestHeight
 
 	// NOTE: We need to get validators from the source chain at height: trustedHeight+1
 	// since the last trusted validators for a header at height h is the NextValidators
@@ -1952,7 +1969,7 @@ func (cc *PenumbraProvider) InjectTrustedFields(ctx context.Context, header ibce
 
 		th, ok := tmpHeader.(*tmclient.Header)
 		if !ok {
-			err = fmt.Errorf("non-tm client header")
+			err = errors.New("non-tm client header")
 		}
 
 		trustedHeader = th
@@ -1990,8 +2007,7 @@ func castClientStateToTMType(cs *codectypes.Any) (*tmclient.ClientState, error) 
 	// cast from interface to concrete type
 	clientState, ok := clientStateExported.(*tmclient.ClientState)
 	if !ok {
-		return &tmclient.ClientState{},
-			fmt.Errorf("error when casting exported clientstate to tendermint type")
+		return &tmclient.ClientState{}, errors.New("error when casting exported clientstate to tendermint type")
 	}
 
 	return clientState, nil
@@ -2057,7 +2073,7 @@ func (cc *PenumbraProvider) NewClientState(
 // QueryIBCHeader returns the IBC compatible block header (CosmosIBCHeader) at a specific height.
 func (cc *PenumbraProvider) QueryIBCHeader(ctx context.Context, h int64) (provider.IBCHeader, error) {
 	if h == 0 {
-		return nil, fmt.Errorf("height cannot be 0")
+		return nil, errors.New("height cannot be 0")
 	}
 
 	lightBlock, err := cc.LightProvider.LightBlock(ctx, h)
@@ -2078,7 +2094,7 @@ func (cc *PenumbraProvider) QueryABCI(ctx context.Context, req abci.RequestQuery
 		Prove:  req.Prove,
 	}
 
-	result, err := cc.RPCClient.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
+	result, err := cc.ConsensusClient.ABCIQueryWithOptions(ctx, req.Path, req.Data, opts)
 	if err != nil {
 		return abci.ResponseQuery{}, err
 	}
@@ -2153,7 +2169,7 @@ func (cc *PenumbraProvider) broadcastTx(
 	asyncTimeout time.Duration, // timeout for waiting for block inclusion
 	asyncCallback func(*provider.RelayerTxResponse, error), // callback for success/fail of the wait for block inclusion
 ) error {
-	res, err := cc.RPCClient.BroadcastTxSync(ctx, tx)
+	res, err := cc.ConsensusClient.BroadcastTxSync(ctx, tx)
 	isErr := err != nil
 	isFailed := res != nil && res.Code != 0
 	if isErr || isFailed {
@@ -2171,7 +2187,7 @@ func (cc *PenumbraProvider) broadcastTx(
 		if isFailed {
 			err = cc.sdkError(res.Codespace, res.Code)
 			if err == nil {
-				err = fmt.Errorf("transaction failed to execute")
+				err = errors.New("transaction failed to execute")
 			}
 		}
 		cc.LogFailedTx(rlyResp, err, msgs)
@@ -2221,7 +2237,7 @@ func (cc *PenumbraProvider) waitForTx(
 		// Check for any registered SDK errors
 		err := cc.sdkError(res.Codespace, res.Code)
 		if err == nil {
-			err = fmt.Errorf("transaction failed to execute")
+			err = errors.New("transaction failed to execute")
 		}
 		if callback != nil {
 			callback(nil, err)
@@ -2249,12 +2265,12 @@ func (cc *PenumbraProvider) waitForBlockInclusion(
 			return nil, fmt.Errorf("timed out after: %d; %w", waitTimeout, ErrTimeoutAfterWaitingForTxBroadcast)
 		// This fixed poll is fine because it's only for logging and updating prometheus metrics currently.
 		case <-time.After(time.Millisecond * 100):
-			res, err := cc.RPCClient.Tx(ctx, txHash, false)
+			res, err := cc.ConsensusClient.Tx(ctx, txHash, false)
 			if err == nil {
 				return cc.mkTxResult(res)
 			}
 			if strings.Contains(err.Error(), "transaction indexing is disabled") {
-				return nil, fmt.Errorf("cannot determine success/failure of tx because transaction indexing is disabled on rpc url")
+				return nil, errors.New("cannot determine success/failure of tx because transaction indexing is disabled on rpc url")
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
