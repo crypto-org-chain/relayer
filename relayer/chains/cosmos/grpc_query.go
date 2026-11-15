@@ -21,13 +21,15 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/proto"
+	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 var _ gogogrpc.ClientConn = &CosmosProvider{}
 
-var protoCodec = encoding.GetCodec(proto.Name)
+// grpc v1.66+ registers the proto codec as CodecV2 only, so GetCodec returns nil.
+var protoCodec = encoding.GetCodecV2(proto.Name)
 
 // Invoke implements the grpc ClientConn.Invoke method
 func (cc *CosmosProvider) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
@@ -65,7 +67,7 @@ func (cc *CosmosProvider) Invoke(ctx context.Context, method string, req, reply 
 		return err
 	}
 
-	if err = protoCodec.Unmarshal(abciRes.Value, reply); err != nil {
+	if err = protoCodec.Unmarshal(mem.BufferSlice{mem.SliceBuffer(abciRes.Value)}, reply); err != nil {
 		return err
 	}
 
@@ -126,7 +128,7 @@ func (cc *CosmosProvider) RunGRPCQuery(ctx context.Context, method string, req i
 
 	abciReq := abci.RequestQuery{
 		Path:   method,
-		Data:   reqBz,
+		Data:   reqBz.Materialize(),
 		Height: height,
 		Prove:  prove,
 	}
