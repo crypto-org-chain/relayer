@@ -30,7 +30,8 @@ func (k mldsa65PubKey) Equals(other slcrypto.PubKey) bool {
 }
 
 // protoMldsa65PubKey decodes the ML-DSA-65 case of the proto PublicKey oneof in validator updates.
-// The embedded type only supplies the oneof's unexported marker method; RPCClient drops validator updates.
+// PublicKey_Ed25519 is embedded only for the oneof's unexported marker method. Its proto methods ignore
+// Mldsa65, so the value must not be re-encoded or compared; RPCClient drops validator updates.
 type protoMldsa65PubKey struct {
 	slpc.PublicKey_Ed25519 `json:"-"`
 

@@ -31,6 +31,22 @@ var _ gogogrpc.ClientConn = &CosmosProvider{}
 // grpc v1.66+ registers the proto codec as CodecV2 only, so GetCodec returns nil.
 var protoCodec = encoding.GetCodecV2(proto.Name)
 
+// GRPCMarshal encodes a gRPC message with grpc's proto codec.
+func GRPCMarshal(msg any) ([]byte, error) {
+	bufs, err := protoCodec.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	defer bufs.Free()
+
+	return bufs.Materialize(), nil
+}
+
+// GRPCUnmarshal decodes a gRPC message with grpc's proto codec.
+func GRPCUnmarshal(bz []byte, msg any) error {
+	return protoCodec.Unmarshal(mem.BufferSlice{mem.SliceBuffer(bz)}, msg)
+}
+
 // Invoke implements the grpc ClientConn.Invoke method
 func (cc *CosmosProvider) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
 	// Two things can happen here:
@@ -67,7 +83,7 @@ func (cc *CosmosProvider) Invoke(ctx context.Context, method string, req, reply 
 		return err
 	}
 
-	if err = protoCodec.Unmarshal(mem.BufferSlice{mem.SliceBuffer(abciRes.Value)}, reply); err != nil {
+	if err = GRPCUnmarshal(abciRes.Value, reply); err != nil {
 		return err
 	}
 
@@ -97,7 +113,7 @@ func (cc *CosmosProvider) NewStream(context.Context, *grpc.StreamDesc, string, .
 // to factorize code between client (Invoke) and server (RegisterGRPCServer)
 // gRPC handlers.
 func (cc *CosmosProvider) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
-	reqBz, err := protoCodec.Marshal(req)
+	reqBz, err := GRPCMarshal(req)
 	if err != nil {
 		return abci.ResponseQuery{}, nil, err
 	}
@@ -128,7 +144,7 @@ func (cc *CosmosProvider) RunGRPCQuery(ctx context.Context, method string, req i
 
 	abciReq := abci.RequestQuery{
 		Path:   method,
-		Data:   reqBz.Materialize(),
+		Data:   reqBz,
 		Height: height,
 		Prove:  prove,
 	}

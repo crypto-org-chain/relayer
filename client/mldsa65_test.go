@@ -41,12 +41,13 @@ func (s *PubKeyDecodeSuite) SetupTest() {
 			ID     json.RawMessage `json:"id"`
 			Method string          `json:"method"`
 		}
-		s.Require().NoError(json.NewDecoder(r.Body).Decode(&req))
+		// Require would call FailNow, which is only valid on the test goroutine.
+		s.NoError(json.NewDecoder(r.Body).Decode(&req))
 
 		result, err := cmtjson.Marshal(s.results[req.Method])
-		s.Require().NoError(err)
+		s.NoError(err)
 
-		s.Require().NoError(json.NewEncoder(w).Encode(map[string]any{
+		s.NoError(json.NewEncoder(w).Encode(map[string]any{
 			"jsonrpc": "2.0",
 			"id":      req.ID,
 			"result":  json.RawMessage(result),
@@ -57,6 +58,21 @@ func (s *PubKeyDecodeSuite) SetupTest() {
 	c, err := slclient.NewClient(server.URL, 5*time.Second)
 	s.Require().NoError(err)
 	s.client = NewRPCClient(c)
+}
+
+func (s *PubKeyDecodeSuite) TestMldsa65Adapter() {
+	priv, err := cmldsa65.GenPrivKey()
+	s.Require().NoError(err)
+	otherPriv, err := cmldsa65.GenPrivKey()
+	s.Require().NoError(err)
+
+	pubKey := priv.PubKey().(cmldsa65.PubKey)
+	adapter := mldsa65PubKey{pubKey}
+
+	s.Require().Equal([]byte(pubKey.Address()), []byte(adapter.Address()))
+	s.Require().True(adapter.Equals(mldsa65PubKey{pubKey}))
+	s.Require().False(adapter.Equals(mldsa65PubKey{otherPriv.PubKey().(cmldsa65.PubKey)}))
+	s.Require().Equal(cometcrypto.PubKey(pubKey), convertPubKey(adapter))
 }
 
 func (s *PubKeyDecodeSuite) TestDecodeValidatorKeys() {
