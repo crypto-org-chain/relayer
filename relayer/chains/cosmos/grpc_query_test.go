@@ -34,6 +34,10 @@ func (s *GRPCCodecSuite) TestRoundTrip() {
 			bz, err := cosmos.GRPCMarshal(&tc.msg)
 			s.Require().NoError(err)
 
+			// A second same-size marshal reuses the pooled buffer, so bz must not alias it.
+			_, err = cosmos.GRPCMarshal(&banktypes.QueryBalanceRequest{Denom: strings.Repeat("b", len(tc.msg.Denom))})
+			s.Require().NoError(err)
+
 			expBz, err := tc.msg.Marshal()
 			s.Require().NoError(err)
 			// bytes.Equal treats the empty message's nil and zero-length encodings as the same.
