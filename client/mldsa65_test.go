@@ -17,6 +17,7 @@ import (
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	slclient "github.com/strangelove-ventures/cometbft-client/client"
+	slpc "github.com/strangelove-ventures/cometbft-client/proto/tendermint/crypto"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,7 +26,30 @@ type PubKeyDecodeSuite struct {
 
 	// results maps a JSON-RPC method to the result the fake node returns for it.
 	results map[string]any
+	raw     *slclient.Client
 	client  RPCClient
+}
+
+type oneofSum interface {
+	Size() int
+	MarshalTo([]byte) (int, error)
+}
+
+// encode checks both marshal paths agree, since each writes the key independently.
+func (s *PubKeyDecodeSuite) encode(sum oneofSum) []byte {
+	b := make([]byte, sum.Size())
+	n, err := sum.MarshalTo(b)
+	s.Require().NoError(err)
+
+	sizedSum, ok := sum.(interface {
+		MarshalToSizedBuffer([]byte) (int, error)
+	})
+	s.Require().True(ok)
+	sized := make([]byte, sum.Size())
+	m, err := sizedSum.MarshalToSizedBuffer(sized)
+	s.Require().NoError(err)
+	s.Require().Equal(b[:n], sized[len(sized)-m:])
+	return b[:n]
 }
 
 func TestPubKeyDecodeSuite(t *testing.T) {
@@ -57,7 +81,33 @@ func (s *PubKeyDecodeSuite) SetupTest() {
 
 	c, err := slclient.NewClient(server.URL, 5*time.Second)
 	s.Require().NoError(err)
+	s.raw = c
 	s.client = NewRPCClient(c)
+}
+
+func (s *PubKeyDecodeSuite) TestProtoMldsa65PubKeyCompare() {
+	key := &protoMldsa65PubKey{Mldsa65: []byte{1, 2, 3}}
+
+	testCases := []struct {
+		name    string
+		other   interface{}
+		equal   bool
+		compare int
+	}{
+		{"same key", &protoMldsa65PubKey{Mldsa65: []byte{1, 2, 3}}, true, 0},
+		{"same key by value", protoMldsa65PubKey{Mldsa65: []byte{1, 2, 3}}, true, 0},
+		{"smaller key", &protoMldsa65PubKey{Mldsa65: []byte{1, 2, 2}}, false, 1},
+		{"larger key", &protoMldsa65PubKey{Mldsa65: []byte{1, 2, 4}}, false, -1},
+		{"empty ed25519 key", &slpc.PublicKey_Ed25519{}, false, 1}, // the embedded ed25519 methods report equal
+		{"nil", nil, false, 1},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			s.Require().Equal(tc.equal, key.Equal(tc.other))
+			s.Require().Equal(tc.compare, key.Compare(tc.other))
+		})
+	}
 }
 
 func (s *PubKeyDecodeSuite) TestMldsa65Adapter() {
@@ -129,8 +179,15 @@ func (s *PubKeyDecodeSuite) TestDecodeValidatorKeys() {
 			_, err = valSet.ToProto()
 			s.Require().NoError(err)
 
-			_, err = s.client.BlockResults(ctx, &height)
+			raw, err := s.raw.BlockResults(ctx, &height)
 			s.Require().NoError(err)
+			s.Require().Len(raw.ValidatorUpdates, 1)
+			decoded := raw.ValidatorUpdates[0].PubKey.Sum
+			s.Require().Equal(s.encode(protoPubKey.Sum), s.encode(decoded))
+
+			res, err := s.client.BlockResults(ctx, &height)
+			s.Require().NoError(err)
+			s.Require().Empty(res.ValidatorUpdates)
 		})
 	}
 }
