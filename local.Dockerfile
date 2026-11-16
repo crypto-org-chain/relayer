@@ -11,7 +11,7 @@ FROM alpine:3.22 AS base-files
 RUN addgroup -g 1000 -S relayer && adduser -u 100 -S relayer -G relayer
 
 # Statically linked busybox for the shell and utils of the final scratch image
-FROM busybox:1.34.1-musl AS busybox-full
+FROM busybox:1.36.1-musl AS busybox-full
 
 # Build final image from scratch
 FROM scratch
