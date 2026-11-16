@@ -52,17 +52,25 @@ func TestFeeMarketTestSuite(t *testing.T) {
 	suite.Run(t, new(FeeMarketTestSuite))
 }
 
-// newABCIQueryServer serves every JSON-RPC request with the given abci_query response.
+// newABCIQueryServer answers the base fee abci_query with resp and rejects any other request.
 func (s *FeeMarketTestSuite) newABCIQueryServer(resp abci.ResponseQuery) *httptest.Server {
 	result, err := cmtjson.Marshal(coretypes.ResultABCIQuery{Response: resp})
 	s.Require().NoError(err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ID json.RawMessage `json:"id"`
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+			Params struct {
+				Path string `json:"path"`
+			} `json:"params"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.Method != "abci_query" || req.Params.Path != queryPath {
+			http.Error(w, "unexpected request: "+req.Method+" "+req.Params.Path, http.StatusBadRequest)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
