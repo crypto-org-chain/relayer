@@ -38,7 +38,6 @@ func TestMemoAndReceiverLimit(t *testing.T) {
 	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "ibc-go-simd",
-			Version:       "main",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
 			ChainConfig: ibc.ChainConfig{
@@ -56,7 +55,6 @@ func TestMemoAndReceiverLimit(t *testing.T) {
 		},
 		{
 			Name:          "ibc-go-simd",
-			Version:       "main",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
 			ChainConfig: ibc.ChainConfig{
@@ -143,6 +141,7 @@ func TestMemoAndReceiverLimit(t *testing.T) {
 	cfg := relayer.Sys().MustGetConfig(t)
 
 	cfg.Global.ICS20MemoLimit = 10
+	cfg.Global.MaxReceiverSize = 128
 
 	cfgOutput := new(cmd.ConfigOutputWrapper)
 	cfgOutput.ProviderConfigs = cmd.ProviderConfigs{}

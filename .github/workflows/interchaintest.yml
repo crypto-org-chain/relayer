@@ -3,9 +3,8 @@ name: TESTING - interchaintest
 on:
   pull_request:
 
-# The other interchaintest suites (conformance, misbehaviour, fee middleware, fee grant and the
-# remaining TestScenario* tests) need ghcr.io/strangelove-ventures/heighliner chain images, which
-# no longer allow anonymous pulls, so CI only runs the tests whose images are public.
+# CI only runs the suites that need no chain image or only public ones (ghcr.io/cosmos/ibc-go-*). The gaia,
+# osmosis, juno and kujira suites need ghcr.io/strangelove-ventures/heighliner images, which no longer allow anonymous pulls.
 jobs:
   scenarios:
     runs-on: ubuntu-latest
@@ -13,6 +12,10 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - TestAccCacheBugfix
+          - TestLocalhost_InterchainAccounts
+          - TestLocalhost_TokenTransfers
+          - TestMemoAndReceiverLimit
           - TestScenarioICAChannelClose
           - TestScenarioInterchainAccounts
 

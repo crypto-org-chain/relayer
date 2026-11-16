@@ -86,7 +86,6 @@ func TestLocalhost_TokenTransfers(t *testing.T) {
 		{
 			Name:          "ibc-go-simd",
 			ChainName:     "simd",
-			Version:       "main",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
 			ChainConfig: ibc.ChainConfig{
@@ -294,7 +293,7 @@ func TestLocalhost_InterchainAccounts(t *testing.T) {
 	numFullNodes := 0
 	image := ibc.DockerImage{
 		Repository: "ghcr.io/cosmos/ibc-go-simd",
-		Version:    "v8.0.0-beta.1",
+		Version:    "v8.0.0",
 		UidGid:     "100:1000",
 	}
 	cdc := cosmos.DefaultEncoding()
@@ -302,7 +301,6 @@ func TestLocalhost_InterchainAccounts(t *testing.T) {
 		{
 			Name:          "ibc-go-simd",
 			ChainName:     "simd",
-			Version:       "main",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
 			ChainConfig: ibc.ChainConfig{
