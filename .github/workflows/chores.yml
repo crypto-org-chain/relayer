@@ -30,6 +30,21 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5.4.0
+      - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6.1.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This fork titles PRs "Problem: ..."; conventional commit types stay allowed.
+          types: |
+            Problem
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert

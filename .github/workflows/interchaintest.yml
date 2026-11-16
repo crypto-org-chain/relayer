@@ -3,194 +3,32 @@ name: TESTING - interchaintest
 on:
   pull_request:
 
+# The other interchaintest suites (conformance, misbehaviour, fee middleware, fee grant and the
+# remaining TestScenario* tests) need ghcr.io/strangelove-ventures/heighliner chain images, which
+# no longer allow anonymous pulls, so CI only runs the tests whose images are public.
 jobs:
-  events:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-events
-
-  legacy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-legacy
-
-  multiple-paths:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-multiple
-
-  misbehaviour:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-misbehaviour
-
-  fee-middleware:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-fee-middleware
-
-  fee-grant:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: checkout relayer
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: interchaintest
-        run: make interchaintest-fee-grant
-
-  prepare-scenario-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate matrix
-        id: set-matrix
-        run: |
-          # Run the command and convert its output to a JSON array
-          TESTS=$(cd interchaintest && go test -list ^TestScenario ./... | grep -v "^ok " | grep -v "proto: duplicate proto type registered" | jq -R -s -c 'split("\n")[:-1]')
-          echo "matrix=${TESTS}" >> $GITHUB_OUTPUT
-  
-  # Note : This job will not start until prepare-scenario-matrix completes sucessfully
   scenarios:
-    needs: prepare-scenario-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        test: ${{fromJson(needs.prepare-scenario-matrix.outputs.matrix)}}
+        test:
+          - TestScenarioICAChannelClose
+          - TestScenarioInterchainAccounts
 
     steps:
-      - name: Set up Go 1.21
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
       - name: checkout relayer
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/cache@v3
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: interchaintest/go.mod
+          cache-dependency-path: |
+            go.sum
+            interchaintest/go.sum
 
       - name: interchaintest
         run: |
           cd interchaintest
-          go test -timeout 30m -race -v -run ${{ matrix.test }}
-
+          go test -timeout 30m -race -v -run '^${{ matrix.test }}$' .
