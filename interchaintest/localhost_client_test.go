@@ -82,7 +82,7 @@ func TestLocalhost_TokenTransfers(t *testing.T) {
 		UidGid:     "100:1000",
 	}
 	cdc := DefaultEncoding()
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayertest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "ibc-go-simd",
 			ChainName:     "simd",
@@ -297,7 +297,7 @@ func TestLocalhost_InterchainAccounts(t *testing.T) {
 		UidGid:     "100:1000",
 	}
 	cdc := cosmos.DefaultEncoding()
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayertest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "ibc-go-simd",
 			ChainName:     "simd",

@@ -98,12 +98,12 @@ func TestRelayerFeeGrant(t *testing.T) {
 
 	var tests = [][]*interchaintest.ChainSpec{
 		{
-			{Name: "gaia", ChainName: "gaia", Version: "v14.1.0", NumValidators: &nv, NumFullNodes: &nf},
-			{Name: "osmosis", ChainName: "osmosis", Version: "v14.0.1", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "osmosis", ChainName: "osmosis", Version: "14.0.1-alpine", NumValidators: &nv, NumFullNodes: &nf},
 		},
 		{
-			{Name: "gaia", ChainName: "gaia", Version: "v14.1.0", NumValidators: &nv, NumFullNodes: &nf},
-			{Name: "kujira", ChainName: "kujira", Version: "v0.8.7", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "kujira", ChainName: "kujira", Version: "v0.9.3-1", NumValidators: &nv, NumFullNodes: &nf},
 		},
 	}
 
@@ -112,7 +112,7 @@ func TestRelayerFeeGrant(t *testing.T) {
 		t.Run(testname, func(t *testing.T) {
 
 			// Chain Factory
-			cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), tt)
+			cf := NewChainFactory(zaptest.NewLogger(t), tt)
 
 			chains, err := cf.Chains(t.Name())
 			require.NoError(t, err)
@@ -562,12 +562,12 @@ func TestRelayerFeeGrantExternal(t *testing.T) {
 
 	var tests = [][]*interchaintest.ChainSpec{
 		{
-			{Name: "gaia", ChainName: "gaia", Version: "v7.0.3", NumValidators: &nv, NumFullNodes: &nf},
-			{Name: "osmosis", ChainName: "osmosis", Version: "v14.0.1", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "osmosis", ChainName: "osmosis", Version: "14.0.1-alpine", NumValidators: &nv, NumFullNodes: &nf},
 		},
 		{
-			{Name: "gaia", ChainName: "gaia", Version: "v7.0.3", NumValidators: &nv, NumFullNodes: &nf},
-			{Name: "kujira", ChainName: "kujira", Version: "v0.8.7", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			{Name: "kujira", ChainName: "kujira", Version: "v0.9.3-1", NumValidators: &nv, NumFullNodes: &nf},
 		},
 	}
 
@@ -576,7 +576,7 @@ func TestRelayerFeeGrantExternal(t *testing.T) {
 		t.Run(testname, func(t *testing.T) {
 
 			// Chain Factory
-			cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), tt)
+			cf := NewChainFactory(zaptest.NewLogger(t), tt)
 
 			chains, err := cf.Chains(t.Name())
 			require.NoError(t, err)

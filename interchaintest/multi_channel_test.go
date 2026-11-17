@@ -30,17 +30,17 @@ func TestMultipleChannelsOneConnection(t *testing.T) {
 	).Build(t, client, network)
 
 	// Define chains involved in test
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:        "gaia",
 			ChainName:   "gaia",
-			Version:     "v14.1.0",
+			Version:     "v19.2.0",
 			ChainConfig: ibc.ChainConfig{GasPrices: "0.00atom"},
 		},
 		{
 			Name:        "osmosis",
 			ChainName:   "osmosis",
-			Version:     "v22.0.0",
+			Version:     "22.0.0",
 			ChainConfig: ibc.ChainConfig{GasPrices: "0.00osmo"},
 		},
 	})

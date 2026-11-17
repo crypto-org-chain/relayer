@@ -3,8 +3,8 @@ name: TESTING - interchaintest
 on:
   pull_request:
 
-# CI only runs the suites that need no chain image or only public ones (ghcr.io/cosmos/ibc-go-*). The gaia,
-# osmosis, juno and kujira suites need ghcr.io/strangelove-ventures/heighliner images, which no longer allow anonymous pulls.
+# The heighliner gaia, osmosis, juno and kujira images no longer allow anonymous pulls, so
+# interchaintest/chains.yaml points those chains at images their projects publish.
 jobs:
   scenarios:
     runs-on: ubuntu-latest
@@ -16,8 +16,20 @@ jobs:
           - TestLocalhost_InterchainAccounts
           - TestLocalhost_TokenTransfers
           - TestMemoAndReceiverLimit
+          - TestRelayerEventProcessor
+          - TestRelayerFeeGrant
+          - TestRelayerFeeGrantExternal
+          - TestRelayerFeeMiddleware
+          - TestRelayerLegacyProcessor
+          - TestRelayerMisbehaviourDetection
+          - TestRelayerMultiplePathsSingleProcess
+          - TestScenarioClientThresholdUpdate
+          - TestScenarioClientTrustingPeriodUpdate
           - TestScenarioICAChannelClose
           - TestScenarioInterchainAccounts
+          - TestScenarioPathFilterAllow
+          - TestScenarioPathFilterDeny
+          - TestScenarioTendermint37Boundary
 
     steps:
       - name: checkout relayer
@@ -35,3 +47,15 @@ jobs:
         run: |
           cd interchaintest
           go test -timeout 30m -race -v -run '^${{ matrix.test }}$' .
+
+  local-dockerfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout relayer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: build local.Dockerfile
+        run: docker build -f local.Dockerfile -t relayer:local .
+
+      - name: run rly from the image
+        run: docker run --rm relayer:local rly version

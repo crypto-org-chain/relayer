@@ -48,20 +48,20 @@ func TestRelayerMisbehaviourDetection(t *testing.T) {
 	numFullNodes := 0
 	logger := zaptest.NewLogger(t)
 
-	cf := interchaintest.NewBuiltinChainFactory(logger, []*interchaintest.ChainSpec{
+	cf := relayertest.NewChainFactory(logger, []*interchaintest.ChainSpec{
 		{
 			Name:          "gaia",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
-			ChainConfig:   ibc.ChainConfig{ChainID: "chain-a", GasPrices: "0.0uatom", Bech32Prefix: "cosmos"},
+			ChainConfig:   ibc.ChainConfig{ChainID: "chain-a", Bech32Prefix: "cosmos"},
 		},
 		{
 			Name:          "gaia",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &numVals,
 			NumFullNodes:  &numFullNodes,
-			ChainConfig:   ibc.ChainConfig{ChainID: "chain-b", GasPrices: "0.0uatom", Bech32Prefix: "cosmos"},
+			ChainConfig:   ibc.ChainConfig{ChainID: "chain-b", Bech32Prefix: "cosmos"},
 		},
 	})
 

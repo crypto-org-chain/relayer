@@ -35,7 +35,7 @@ func TestMemoAndReceiverLimit(t *testing.T) {
 		UidGid:     "100:1000",
 	}
 
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayertest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "ibc-go-simd",
 			NumValidators: &numVals,
