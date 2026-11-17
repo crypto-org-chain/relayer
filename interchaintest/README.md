@@ -43,5 +43,8 @@ Your go.mod file should update respectively.
 
 interchaintest requires non-trivial resources to run. As such, CI tests are partitioned. See [the github workflow](../.github/workflows/interchaintest.yml).
 
-If you want a test to be included in CI automatically, name your test with prefix `TestScenario`. For these tests, 
+To run a test in CI, add it to the `scenarios` matrix in that workflow. For these tests,
 it's highly recommended to use a simple network of 1 validator and no full nodes.
+
+Chain images come from [chains.yaml](chains.yaml), which replaces interchaintest's built-in chain list.
+Set `IBCTEST_CONFIGURED_CHAINS` to use another file.

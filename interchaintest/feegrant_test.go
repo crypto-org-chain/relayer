@@ -99,6 +99,7 @@ func TestRelayerFeeGrant(t *testing.T) {
 	var tests = [][]*interchaintest.ChainSpec{
 		{
 			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			// The plain osmolabs tag has no shell, and interchaintest key recovery runs sh -c.
 			{Name: "osmosis", ChainName: "osmosis", Version: "14.0.1-alpine", NumValidators: &nv, NumFullNodes: &nf},
 		},
 		{
@@ -563,6 +564,7 @@ func TestRelayerFeeGrantExternal(t *testing.T) {
 	var tests = [][]*interchaintest.ChainSpec{
 		{
 			{Name: "gaia", ChainName: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+			// The plain osmolabs tag has no shell, and interchaintest key recovery runs sh -c.
 			{Name: "osmosis", ChainName: "osmosis", Version: "14.0.1-alpine", NumValidators: &nv, NumFullNodes: &nf},
 		},
 		{

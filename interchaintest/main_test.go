@@ -13,7 +13,8 @@ import (
 
 const configuredChainsEnv = "IBCTEST_CONFIGURED_CHAINS"
 
-// builtinGenesisPatches holds genesis changes for built-in chains whose public images differ from the ones these tests were written for.
+// Genesis changes for built-in chains whose public images differ from the ones these tests were written for.
+// Keyed by spec Name and applied to every version, so the gaia entry assumes gaia v19+.
 var builtinGenesisPatches = map[string][]cosmos.GenesisKV{
 	// Gaia v19+ ships x/feemarket with fee denom "stake" and a minimum gas price of 1uatom, far above the
 	// configured gas price. Its fallback fee check keeps that minimum even with feemarket disabled, so lower it to
@@ -25,7 +26,7 @@ var builtinGenesisPatches = map[string][]cosmos.GenesisKV{
 	},
 }
 
-// TestMain points interchaintest at chains.yaml unless the caller already set its own chain configs.
+// Keeps a caller-set chain config so local runs can try other images.
 func TestMain(m *testing.M) {
 	if os.Getenv(configuredChainsEnv) == "" {
 		path, err := filepath.Abs("chains.yaml")
@@ -40,7 +41,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// NewChainFactory builds a built-in chain factory, applying builtinGenesisPatches to each spec that does not set its own ModifyGenesis.
+// A spec with its own ModifyGenesis skips the built-in patch, so it must include those changes itself.
 func NewChainFactory(log *zap.Logger, specs []*interchaintest.ChainSpec) *interchaintest.BuiltinChainFactory {
 	for _, s := range specs {
 		if kv, ok := builtinGenesisPatches[s.Name]; ok && s.ModifyGenesis == nil {

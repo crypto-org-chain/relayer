@@ -346,6 +346,7 @@ func TestScenarioClientTrustingPeriodUpdate(t *testing.T) {
 
 // Drops the localhost connection ibc-go v7.1+ creates at genesis, so only the path's connections remain.
 func ibcConnections(ctx context.Context, t *testing.T, r ibc.Relayer, eRep ibc.RelayerExecReporter, chainID string) ibc.ConnectionOutputs {
+	t.Helper()
 	conns, err := r.GetConnections(ctx, eRep, chainID)
 	require.NoError(t, err)
 	return slices.DeleteFunc(conns, func(c *ibc.ConnectionOutput) bool {

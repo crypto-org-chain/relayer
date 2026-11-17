@@ -10,7 +10,7 @@ gaia:
   bech32-prefix: cosmos
   denom: uatom
   gas-prices: 0.01uatom
-  # Gaia v19+ uses about 32% more gas to deliver some IBC client txs (MsgSubmitMisbehaviour, MsgCreateClient) than it simulates.
+  # Gaia v19+ uses about 31% more gas to deliver some IBC client txs (MsgSubmitMisbehaviour, MsgCreateClient) than it simulates.
   # Set here because a ChainSpec's GasAdjustment cannot override a non-zero built-in value.
   gas-adjustment: 1.5
   trusting-period: 504h

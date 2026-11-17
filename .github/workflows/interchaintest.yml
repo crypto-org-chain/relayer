@@ -3,8 +3,14 @@ name: TESTING - interchaintest
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 # The heighliner gaia, osmosis, juno and kujira images no longer allow anonymous pulls, so
 # interchaintest/chains.yaml points those chains at images their projects publish.
+# Not run here: TestScenarioStrideICAandICQ (its heighliner stride image is not public), and
+# TestClientOverrideFlag, TestMultipleChannelsOneConnection, TestRelayerDocker* and TestRelayerInProcess,
+# which upstream CI never ran either.
 jobs:
   scenarios:
     runs-on: ubuntu-latest
