@@ -25,17 +25,17 @@ func interchaintestConformance(t *testing.T, rf interchaintest.RelayerFactory) {
 	nf := 1
 	nv := 1
 
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "gaia",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: "cosmoshub-1004"},
 		},
 		{
 			Name:          "osmosis",
-			Version:       "v22.0.0",
+			Version:       "22.0.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: "osmosis-1001"},

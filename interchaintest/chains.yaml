@@ -1,0 +1,90 @@
+# Built-in chain configs for the chains these tests use, replacing interchaintest's embedded
+# configuredChains.yaml. The heighliner gaia, osmosis, juno and kujira images no longer allow
+# anonymous pulls, so those chains point at images their projects publish. ChainSpec.Version
+# selects the tag in each repository below. Loaded through IBCTEST_CONFIGURED_CHAINS (see main_test.go).
+
+gaia:
+  name: gaia
+  type: cosmos
+  bin: gaiad
+  bech32-prefix: cosmos
+  denom: uatom
+  gas-prices: 0.01uatom
+  # Gaia v19+ uses about 31% more gas to deliver some IBC client txs (MsgSubmitMisbehaviour, MsgCreateClient) than it simulates.
+  # Set here because a ChainSpec's GasAdjustment cannot override a non-zero built-in value.
+  gas-adjustment: 1.5
+  trusting-period: 504h
+  images:
+    - repository: ghcr.io/cosmos/gaia
+      uid-gid: 1025:1025
+  no-host-mount: false
+
+ibc-go-simd:
+  name: ibc-go-simd
+  type: cosmos
+  bin: simd
+  bech32-prefix: cosmos
+  denom: photon
+  gas-prices: 0.0photon
+  gas-adjustment: 1.2
+  trusting-period: 504h
+  images:
+    - repository: ghcr.io/strangelove-ventures/heighliner/ibc-go-simd
+      uid-gid: 1025:1025
+  no-host-mount: false
+
+icad:
+  name: icad
+  type: cosmos
+  bin: icad
+  bech32-prefix: cosmos
+  denom: photon
+  gas-prices: 0.0photon
+  gas-adjustment: 1.2
+  trusting-period: 504h
+  images:
+    - repository: ghcr.io/cosmos/ibc-go-icad
+      uid-gid: 1025:1025
+  no-host-mount: false
+
+juno:
+  name: juno
+  type: cosmos
+  bin: junod
+  bech32-prefix: juno
+  denom: ujuno
+  gas-prices: 0.0025ujuno
+  gas-adjustment: 1.3
+  trusting-period: 672h
+  images:
+    - repository: ghcr.io/cosmoscontracts/juno
+      uid-gid: 1025:1025
+  no-host-mount: false
+
+kujira:
+  name: kujira
+  type: cosmos
+  bin: kujirad
+  bech32-prefix: kujira
+  denom: ukuji
+  gas-prices: 0.01ukuji
+  gas-adjustment: 1.3
+  trusting-period: 336h
+  images:
+    - repository: teamkujira/kujira
+      uid-gid: 1025:1025
+  no-host-mount: false
+
+osmosis:
+  name: osmosis
+  type: cosmos
+  bin: osmosisd
+  bech32-prefix: osmo
+  denom: uosmo
+  gas-prices: 0.0025uosmo
+  gas-adjustment: 1.3
+  trusting-period: 336h
+  images:
+    - repository: osmolabs/osmosis
+      uid-gid: 1025:1025
+  no-host-mount: false

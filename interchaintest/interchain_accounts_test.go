@@ -37,7 +37,7 @@ func TestScenarioInterchainAccounts(t *testing.T) {
 	// Get both chains
 	nf := 0
 	nv := 1
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "icad",
 			NumValidators: &nv,

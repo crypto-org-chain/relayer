@@ -3,9 +3,11 @@ package interchaintest_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
 	relayerinterchaintest "github.com/cosmos/relayer/v2/interchaintest"
 	"github.com/strangelove-ventures/interchaintest/v8"
 	"github.com/strangelove-ventures/interchaintest/v8/chain/cosmos"
@@ -33,12 +35,12 @@ func TestScenarioClientThresholdUpdate(t *testing.T) {
 	nf := 0
 
 	// Chain Factory
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		// Two otherwise identical chains that only differ by ChainName and ChainID.
 		{
 			Name:          "gaia",
 			ChainName:     "g0",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: g0ChainId},
@@ -46,7 +48,7 @@ func TestScenarioClientThresholdUpdate(t *testing.T) {
 		{
 			Name:          "gaia",
 			ChainName:     "g1",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: g1ChainId},
@@ -122,14 +124,12 @@ func TestScenarioClientThresholdUpdate(t *testing.T) {
 
 	const heightOffset = 10
 
-	g0Conns, err := r.GetConnections(ctx, eRep, g0ChainId)
-	require.NoError(t, err)
+	g0Conns := ibcConnections(ctx, t, r, eRep, g0ChainId)
 	require.Len(t, g0Conns, 1)
 
 	g0ClientID := g0Conns[0].ClientID
 
-	g1Conns, err := r.GetConnections(ctx, eRep, g1ChainId)
-	require.NoError(t, err)
+	g1Conns := ibcConnections(ctx, t, r, eRep, g1ChainId)
 	require.Len(t, g1Conns, 1)
 
 	g1ClientID := g1Conns[0].ClientID
@@ -189,12 +189,12 @@ func TestScenarioClientTrustingPeriodUpdate(t *testing.T) {
 	nf := 0
 
 	// Chain Factory
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		// Two otherwise identical chains that only differ by ChainID.
 		{
 			Name:          "gaia",
 			ChainName:     "g0",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: g0ChainId},
@@ -202,7 +202,7 @@ func TestScenarioClientTrustingPeriodUpdate(t *testing.T) {
 		{
 			Name:          "gaia",
 			ChainName:     "g1",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 			ChainConfig:   ibc.ChainConfig{ChainID: g1ChainId},
@@ -280,14 +280,12 @@ func TestScenarioClientTrustingPeriodUpdate(t *testing.T) {
 
 	const heightOffset = 10
 
-	g0Conns, err := r.GetConnections(g0Ctx, eRep, g0ChainId)
-	require.NoError(t, err)
+	g0Conns := ibcConnections(g0Ctx, t, r, eRep, g0ChainId)
 	require.Len(t, g0Conns, 1)
 
 	g0ClientID := g0Conns[0].ClientID
 
-	g1Conns, err := r.GetConnections(g1Ctx, eRep, g1ChainId)
-	require.NoError(t, err)
+	g1Conns := ibcConnections(g1Ctx, t, r, eRep, g1ChainId)
 	require.Len(t, g1Conns, 1)
 
 	g1ClientID := g1Conns[0].ClientID
@@ -344,4 +342,14 @@ func TestScenarioClientTrustingPeriodUpdate(t *testing.T) {
 	})
 
 	require.NoError(t, eg.Wait())
+}
+
+// Drops the localhost connection ibc-go v7.1+ creates at genesis, so only the path's connections remain.
+func ibcConnections(ctx context.Context, t *testing.T, r ibc.Relayer, eRep ibc.RelayerExecReporter, chainID string) ibc.ConnectionOutputs {
+	t.Helper()
+	conns, err := r.GetConnections(ctx, eRep, chainID)
+	require.NoError(t, err)
+	return slices.DeleteFunc(conns, func(c *ibc.ConnectionOutput) bool {
+		return c.ID == ibcexported.LocalhostConnectionID
+	})
 }
