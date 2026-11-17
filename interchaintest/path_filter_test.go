@@ -28,9 +28,9 @@ func TestScenarioPathFilterAllow(t *testing.T) {
 	nf := 0
 
 	// Chain Factory
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
-		{Name: "gaia", Version: "v14.1.0", NumValidators: &nv, NumFullNodes: &nf},
-		{Name: "osmosis", Version: "v22.0.0", NumValidators: &nv, NumFullNodes: &nf},
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+		{Name: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+		{Name: "osmosis", Version: "22.0.0", NumValidators: &nv, NumFullNodes: &nf},
 	})
 
 	chains, err := cf.Chains(t.Name())
@@ -175,9 +175,9 @@ func TestScenarioPathFilterDeny(t *testing.T) {
 	nf := 0
 
 	// Chain Factory
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
-		{Name: "gaia", Version: "v14.1.0", NumValidators: &nv, NumFullNodes: &nf},
-		{Name: "osmosis", Version: "v22.0.0", NumValidators: &nv, NumFullNodes: &nf},
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+		{Name: "gaia", Version: "v19.2.0", NumValidators: &nv, NumFullNodes: &nf},
+		{Name: "osmosis", Version: "22.0.0", NumValidators: &nv, NumFullNodes: &nf},
 	})
 
 	chains, err := cf.Chains(t.Name())

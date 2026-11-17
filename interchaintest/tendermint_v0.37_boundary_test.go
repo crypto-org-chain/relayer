@@ -21,11 +21,11 @@ func TestScenarioTendermint37Boundary(t *testing.T) {
 	nv := 1
 	nf := 0
 
-	cf := interchaintest.NewBuiltinChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
+	cf := relayerinterchaintest.NewChainFactory(zaptest.NewLogger(t), []*interchaintest.ChainSpec{
 		{
 			Name:          "gaia",
 			ChainName:     "gaia",
-			Version:       "v14.1.0",
+			Version:       "v19.2.0",
 			NumValidators: &nv,
 			NumFullNodes:  &nf,
 		},

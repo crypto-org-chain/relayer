@@ -1,33 +1,18 @@
-FROM --platform=$BUILDPLATFORM golang:1.21-alpine3.17 AS build-env
+# Builds for the target platform natively (CI uses one runner per platform); a cross build runs under QEMU.
+FROM golang:1.21-alpine3.17 AS build-env
 
 RUN apk add --update --no-cache curl make git libc-dev bash gcc linux-headers eudev-dev
 
-ARG TARGETARCH
-ARG BUILDARCH
-
-RUN if [ "${TARGETARCH}" = "arm64" ] && [ "${BUILDARCH}" != "arm64" ]; then \
-    wget -c https://musl.cc/aarch64-linux-musl-cross.tgz -O - | tar -xzvv --strip-components 1 -C /usr; \
-    elif [ "${TARGETARCH}" = "amd64" ] && [ "${BUILDARCH}" != "amd64" ]; then \
-    wget -c https://musl.cc/x86_64-linux-musl-cross.tgz -O - | tar -xzvv --strip-components 1 -C /usr; \
-    fi
-
 ADD . .
 
-RUN if [ "${TARGETARCH}" = "arm64" ] && [ "${BUILDARCH}" != "arm64" ]; then \
-    export CC=aarch64-linux-musl-gcc CXX=aarch64-linux-musl-g++;\
-    elif [ "${TARGETARCH}" = "amd64" ] && [ "${BUILDARCH}" != "amd64" ]; then \
-    export CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++; \
-    fi; \
-    GOOS=linux GOARCH=$TARGETARCH CGO_ENABLED=1 LDFLAGS='-linkmode external -extldflags "-static"' make install
+RUN CGO_ENABLED=1 LDFLAGS='-linkmode external -extldflags "-static"' make install
 
-RUN if [ -d "/go/bin/linux_${TARGETARCH}" ]; then mv /go/bin/linux_${TARGETARCH}/* /go/bin/; fi
+# CA certificates and the relayer user for the final scratch image
+FROM alpine:3.22 AS base-files
+RUN addgroup -g 1000 -S relayer && adduser -u 100 -S relayer -G relayer
 
-# Use minimal busybox from infra-toolkit image for final scratch image
-FROM ghcr.io/strangelove-ventures/infra-toolkit:v0.0.6 AS busybox-min
-RUN addgroup --gid 1000 -S relayer && adduser --uid 100 -S relayer -G relayer
-
-# Use ln and rm from full featured busybox for assembling final image
-FROM busybox:1.34.1-musl AS busybox-full
+# Statically linked busybox for the shell and utils of the final scratch image
+FROM busybox:1.36.1-musl AS busybox-full
 
 # Build final image from scratch
 FROM scratch
@@ -39,8 +24,8 @@ WORKDIR /bin
 # Install ln (for making hard links) and rm (for cleanup) from full busybox image (will be deleted, only needed for image assembly)
 COPY --from=busybox-full /bin/ln /bin/rm ./
 
-# Install minimal busybox image as shell binary (will create hardlinks for the rest of the binaries to this data)
-COPY --from=busybox-min /busybox/busybox /bin/sh
+# Install busybox as shell binary (will create hardlinks for the rest of the binaries to this data)
+COPY --from=busybox-full /bin/busybox /bin/sh
 
 # Add hard links for read-only utils, then remove ln and rm
 # Will then only have one copy of the busybox minimal binary file with all utils pointing to the same underlying inode
@@ -60,11 +45,11 @@ RUN ln sh pwd && \
 COPY --from=build-env /bin/rly /bin
 
 # Install trusted CA certificates
-COPY --from=busybox-min /etc/ssl/cert.pem /etc/ssl/cert.pem
+COPY --from=base-files /etc/ssl/cert.pem /etc/ssl/cert.pem
 
 # Install relayer user
-COPY --from=busybox-min /etc/passwd /etc/passwd
-COPY --from=busybox-min --chown=100:1000 /home/relayer /home/relayer
+COPY --from=base-files /etc/passwd /etc/passwd
+COPY --from=base-files --chown=100:1000 /home/relayer /home/relayer
 
 WORKDIR /home/relayer
 USER relayer
