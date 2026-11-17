@@ -574,6 +574,8 @@ func convertPubKey(pk slcrypto.PubKey) cometcrypto.PubKey {
 		return csecp256k1.PubKey(key)
 	case sr25519.PubKey:
 		return csr25519.PubKey(key)
+	case mldsa65PubKey:
+		return key.PubKey
 	default:
 		return nil
 	}

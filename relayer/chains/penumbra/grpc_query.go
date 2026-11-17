@@ -16,18 +16,15 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	"github.com/cosmos/cosmos-sdk/types/tx"
 	gogogrpc "github.com/cosmos/gogoproto/grpc"
+	"github.com/cosmos/relayer/v2/relayer/chains/cosmos"
 	"github.com/cosmos/relayer/v2/relayer/provider"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/encoding"
-	"google.golang.org/grpc/encoding/proto"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
 var _ gogogrpc.ClientConn = &PenumbraProvider{}
-
-var protoCodec = encoding.GetCodec(proto.Name)
 
 // Invoke implements the grpc ClientConn.Invoke method
 func (cc *PenumbraProvider) Invoke(ctx context.Context, method string, req, reply interface{}, opts ...grpc.CallOption) (err error) {
@@ -65,7 +62,7 @@ func (cc *PenumbraProvider) Invoke(ctx context.Context, method string, req, repl
 		return err
 	}
 
-	if err = protoCodec.Unmarshal(abciRes.Value, reply); err != nil {
+	if err = cosmos.GRPCUnmarshal(abciRes.Value, reply); err != nil {
 		return err
 	}
 
@@ -95,7 +92,7 @@ func (cc *PenumbraProvider) NewStream(context.Context, *grpc.StreamDesc, string,
 // to factorize code between client (Invoke) and server (RegisterGRPCServer)
 // gRPC handlers.
 func (cc *PenumbraProvider) RunGRPCQuery(ctx context.Context, method string, req interface{}, md metadata.MD) (abci.ResponseQuery, metadata.MD, error) {
-	reqBz, err := protoCodec.Marshal(req)
+	reqBz, err := cosmos.GRPCMarshal(req)
 	if err != nil {
 		return abci.ResponseQuery{}, nil, err
 	}

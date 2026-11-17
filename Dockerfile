@@ -1,8 +1,10 @@
 # Builds for the target platform natively (CI uses one runner per platform); a cross build runs under QEMU.
-FROM golang:1.21-alpine3.17 AS build-env
+FROM golang:1.22-alpine3.20 AS build-env
 
 RUN apk add --update --no-cache curl make git libc-dev bash gcc linux-headers eudev-dev
 
+# Outside GOPATH (/go), so make install writes /go/bin/rly on every Go version.
+WORKDIR /src
 ADD . .
 
 RUN CGO_ENABLED=1 LDFLAGS='-linkmode external -extldflags "-static"' make install
@@ -42,7 +44,7 @@ RUN ln sh pwd && \
     rm ln rm
 
 # Install chain binaries
-COPY --from=build-env /bin/rly /bin
+COPY --from=build-env /go/bin/rly /bin
 
 # Install trusted CA certificates
 COPY --from=base-files /etc/ssl/cert.pem /etc/ssl/cert.pem
